@@ -8,21 +8,23 @@ from pydub import AudioSegment, playback
 
 
 def exec_cmd_TTS(cmd, speakerUuid, styleId, text):
-    if os.name == "nt":
+    if os.name == "nt": # nt == windows
         output = subprocess.run(" ".join(cmd), shell=True, capture_output=True, text=True)
     else:
         output = subprocess.run(cmd, capture_output=True, text=True)
 
     if output.returncode != 0:
         print(output.stderr)
-        prosody = estimate_prosody().json()
+        prosody = estimate_prosody(text).json()
         response = synthesis_speak(speakerUuid, styleId, text, prosody["detail"])
         playback.play(
             AudioSegment(response.content, sample_width=2, frame_rate=44100, channels=1)
         )
     else:
-        print(output.stdout)
+        print(output.stdout, end="")
 
+
+# localhost:50032 == coeiroink API
 
 def estimate_prosody(text):
     return requests.post(
@@ -44,7 +46,7 @@ def synthesis_speak(
         volumeScale=1.00,
         prePhonemeLength=0.10,
         postPhonemeLength=0.10,
-        outputSamplingRate=0
+        outputSamplingRate=44100
     ):
 
     return requests.post(
@@ -66,7 +68,7 @@ def synthesis_speak(
 
 
 if __name__ == "__main__":
-    speakerUuid = "cb11bdbd-78fc-4f16-b528-a400bae1782d",
+    speakerUuid = "cb11bdbd-78fc-4f16-b528-a400bae1782d"
     styleId = 92
     text = "ざこ"
     cmd = sys.argv[1:]
