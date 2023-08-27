@@ -1,4 +1,7 @@
+import glob
+import json
 import os
+import random
 import requests
 import subprocess
 import sys
@@ -7,7 +10,7 @@ import sys
 from pydub import AudioSegment, playback
 
 
-def exec_cmd_TTS(cmd, speakerUuid, styleId, text):
+def exec_cmd_TTS(cmd, speak_dict):
     if os.name == "nt": # nt == windows
         output = subprocess.run(" ".join(cmd), shell=True, capture_output=True, text=True)
     else:
@@ -15,62 +18,60 @@ def exec_cmd_TTS(cmd, speakerUuid, styleId, text):
 
     if output.returncode != 0:
         print(output.stderr)
-        prosody = estimate_prosody(text).json()
-        response = synthesis_speak(speakerUuid, styleId, text, prosody["detail"])
-        playback.play(
-            AudioSegment(response.content, sample_width=2, frame_rate=44100, channels=1)
-        )
+        speak_cink(speak_dict)
     else:
         print(output.stdout, end="")
 
 
+def speak_cink(dct):
+    response = synthesis_speak(dct=dct)
+    playback.play(
+        AudioSegment(response.content, sample_width=2, frame_rate=44100, channels=1)
+    )
+
+
+def get_speak_from_json(file_path):
+    with open(file_path, "r", encoding="utf-8") as f:
+        jsn = json.load(f)
+    speaklist = []
+    for i in jsn["textBoxes"]:
+        speaklist.append(
+            dict(
+                speakerUuid=i["speakerUuid"],
+                styleId=i["styleId"],
+                text=i["text"],
+                prosodyDetail=i["prosodyDetail"],
+                speedScale=i["speedScale"],
+                pitchScale=i["pitchScale"],
+                intonationScale=i["intonationScale"],
+                volumeScale=i["volumeScale"],
+                prePhonemeLength=i["prePhonemeLength"],
+                postPhonemeLength=i["postPhonemeLength"],
+                outputSamplingRate=44100
+            )
+        )
+    return speaklist
+
+
 # localhost:50032 == coeiroink API
+url = "http://localhost:50032/v1"
 
-def estimate_prosody(text):
-    return requests.post(
-        "http://localhost:50032/v1/estimate_prosody",
-        json={
-            "text": text
-        }
+
+def synthesis_speak(dct):
+    response = requests.post(
+        f"{url}/synthesis",
+        json=dct
     )
-
-
-def synthesis_speak(
-        speakerUuid,
-        styleId,
-        text,
-        prosodyDetail,
-        speedScale=1.00,
-        pitchScale=0.00,
-        intonationScale=1.00,
-        volumeScale=1.00,
-        prePhonemeLength=0.10,
-        postPhonemeLength=0.10,
-        outputSamplingRate=44100
-    ):
-
-    return requests.post(
-        "http://localhost:50032/v1/synthesis",
-        json={
-            "speakerUuid": speakerUuid,
-            "styleId": styleId,
-            "text": text,
-            "prosodyDetail":prosodyDetail,
-            "speedScale": speedScale,
-            "pitchScale": pitchScale,
-            "intonationScale": intonationScale,
-            "volumeScale": volumeScale,
-            "prePhonemeLength": prePhonemeLength,
-            "postPhonemeLength": postPhonemeLength,
-            "outputSamplingRate": outputSamplingRate
-        }
-    )
+    return response
 
 
 if __name__ == "__main__":
-    speakerUuid = "cb11bdbd-78fc-4f16-b528-a400bae1782d"
-    styleId = 92
-    text = "ざこ"
     cmd = sys.argv[1:]
-    exec_cmd_TTS(cmd, speakerUuid, styleId, text)
+    path = "./*.cink"
+
+    settingfilelist = glob.glob(path)
+    speaks = get_speak_from_json(settingfilelist[0])
+    randspeak = random.choice(speaks)
+
+    exec_cmd_TTS(cmd, randspeak)
 
